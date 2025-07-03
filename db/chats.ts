@@ -1,81 +1,28 @@
-import { supabase } from "@/lib/supabase/browser-client"
-import { TablesInsert, TablesUpdate } from "@/supabase/types"
+import type { NextApiRequest, NextApiResponse } from "next";
 
-export const getChatById = async (chatId: string) => {
-  const { data: chat } = await supabase
-    .from("chats")
-    .select("*")
-    .eq("id", chatId)
-    .maybeSingle()
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== "POST") return res.status(405).end();
 
-  return chat
-}
+  const userMessage = req.body.message;
 
-export const getChatsByWorkspaceId = async (workspaceId: string) => {
-  const { data: chats, error } = await supabase
-    .from("chats")
-    .select("*")
-    .eq("workspace_id", workspaceId)
-    .order("created_at", { ascending: false })
+  try {
+    const flowiseResponse = await fetch("https://flowise-lab.enigmaa.in/api/v1/prediction/6a619533-06fd-4df6-a07c-88403bb5c418", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        question: userMessage
+      })
+    });
 
-  if (!chats) {
-    throw new Error(error.message)
+    const data = await flowiseResponse.json();
+
+    return res.status(200).json({
+      response: data.text // Adjust based on Flowise API response
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: "Flowise API error" });
   }
-
-  return chats
-}
-
-export const createChat = async (chat: TablesInsert<"chats">) => {
-  const { data: createdChat, error } = await supabase
-    .from("chats")
-    .insert([chat])
-    .select("*")
-    .single()
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  return createdChat
-}
-
-export const createChats = async (chats: TablesInsert<"chats">[]) => {
-  const { data: createdChats, error } = await supabase
-    .from("chats")
-    .insert(chats)
-    .select("*")
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  return createdChats
-}
-
-export const updateChat = async (
-  chatId: string,
-  chat: TablesUpdate<"chats">
-) => {
-  const { data: updatedChat, error } = await supabase
-    .from("chats")
-    .update(chat)
-    .eq("id", chatId)
-    .select("*")
-    .single()
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  return updatedChat
-}
-
-export const deleteChat = async (chatId: string) => {
-  const { error } = await supabase.from("chats").delete().eq("id", chatId)
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  return true
 }
